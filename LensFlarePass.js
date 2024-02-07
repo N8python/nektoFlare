@@ -91,7 +91,7 @@ class LensFlarePass extends Pass {
             gl_Position = vec4(position, 1);
         }`,
             fragmentShader: /* glsl */ `
-        uniform sampler2D depthTexture;
+        uniform highp sampler2D depthTexture;
         varying vec2 vUv;
         void main() {
            gl_FragDepth = texture2D(depthTexture, vUv).r + 0.00001;
@@ -202,15 +202,6 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
          }*/
 
         const flareTransparentBlockers = new THREE.InstancedMesh(new THREE.CircleGeometry(1.25 * coverageScale, 32), new THREE.MeshBasicMaterial({ color: 0, side: THREE.DoubleSide, depthWrite: true, colorWrite: false }), this.flares.length);
-        const dummy = new THREE.Object3D();
-        for (let i = 0; i < this.flares.length; i++) {
-            const flare = this.flares[i];
-            dummy.position.copy(flare.position);
-            dummy.lookAt(this.camera.getWorldPosition(new THREE.Vector3()));
-            dummy.updateMatrix();
-            flareTransparentBlockers.setMatrixAt(i, dummy.matrix);
-        }
-        flareTransparentBlockers.instanceMatrix.needsUpdate = true;
         flareTransparentBlockers.visible = false;
         this.flareTransparentBlockers = flareTransparentBlockers;
         this.scene.add(flareTransparentBlockers);
@@ -235,10 +226,10 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
                 }
             `,
             fragmentShader: /*glsl*/ `
-                uniform sampler2D depthTexture;
-                uniform sampler2D transparencyDWFalse;
-                uniform sampler2D transparencyDWTrue;
-                uniform sampler2D transparencyDWTrueDepth;
+                uniform highp sampler2D depthTexture;
+                uniform highp sampler2D transparencyDWFalse;
+                uniform highp sampler2D transparencyDWTrue;
+                uniform highp sampler2D transparencyDWTrueDepth;
                 uniform bool doTransparency;
                 uniform float coverageRadius;
                 uniform mat4 projMat;
@@ -351,8 +342,8 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
             uniform vec3 cameraPos;
             uniform vec3 cameraDirection;
             varying vec2 vUv;
-            uniform sampler2D coverageTexture;
-            uniform sampler2D depthTexture;
+            uniform highp sampler2D coverageTexture;
+            uniform highp sampler2D depthTexture;
 
             float uDispersal = 0.3;
             float uHaloWidth = 0.6;
@@ -672,16 +663,22 @@ c.r+=f1+f2+f4+f5+f6; c.g+=f1+f22+f42+f52+f62; c.b+=f1+f23+f43+f53+f63;
             const flare = this.flares[i];
             dummy.position.copy(flare.position);
             dummy.lookAt(this.camera.getWorldPosition(new THREE.Vector3()));
+            if (this.flares[i].enabled && this.flares[i].visible && this.flares[i].opacity > 0) {
+                dummy.scale.set(1, 1, 1);
+            } else {
+                dummy.scale.set(0, 0, 0);
+            }
             dummy.updateMatrix();
+
             flareTransparentBlockers.setMatrixAt(i, dummy.matrix);
         }
         flareTransparentBlockers.instanceMatrix.needsUpdate = true;
         flareTransparentBlockers.visible = true;
 
         renderer.render(flareTransparentBlockers, this.camera);
+        flareTransparentBlockers.visible = false;
         renderer.render(this.scene, this.camera);
 
-        flareTransparentBlockers.visible = false;
 
         // Render out transparent objects WITH depth write
 
@@ -702,6 +699,9 @@ c.r+=f1+f2+f4+f5+f6; c.g+=f1+f22+f42+f52+f62; c.b+=f1+f23+f43+f53+f63;
         renderer.setClearColor(oldClearColor, oldClearAlpha);
         this.scene.background = oldBackground;
         renderer.autoClearDepth = oldAutoClearDepth;
+    }
+    setFlares(flares) {
+        this.flares = flares;
     }
     render(renderer, inputBuffer, outputBuffer) {
         const xrEnabled = renderer.xr.enabled;
@@ -732,8 +732,9 @@ c.r+=f1+f2+f4+f5+f6; c.g+=f1+f22+f42+f52+f62; c.b+=f1+f23+f43+f53+f63;
             this.flareQuad.render(renderer);
             renderer.autoClear = oldAutoClear;
         }*/
-        for (let i = 0; i < this.flares.length; i += 4) {
-            const batch = this.flares.slice(i, i + 4);
+        const flaresToRender = this.flares.filter(flare => flare.enabled && flare.visible && flare.opacity > 0);
+        for (let i = 0; i < flaresToRender.length; i += 4) {
+            const batch = flaresToRender.slice(i, i + 4);
             batch.forEach(flare => flare.project(this.camera));
             renderer.setRenderTarget(this.coverageTarget);
             renderer.clear();

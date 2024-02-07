@@ -598,6 +598,9 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
         this.height = height;
         this.flareRenderTarget.setSize(width / 2, height / 2);
     }
+    setFlares(flares) {
+        this.flares = flares;
+    }
 
     render(renderer, inputBuffer, outputBuffer) {
         const xrEnabled = renderer.xr.enabled;

@@ -108,41 +108,45 @@ async function main() {
         renderMode: "Combined",
         color: [0, 0, 0],
         colorMultiply: true,
-        accumulate: false
+        accumulate: false,
+        flareAmount: 64
     };
     const gui = new GUI();
-    gui.add(effectController, "aoSamples", 1.0, 64.0, 1.0);
-    gui.add(effectController, "denoiseSamples", 1.0, 64.0, 1.0);
-    gui.add(effectController, "denoiseRadius", 0.0, 24.0, 0.01);
-    const aor = gui.add(effectController, "aoRadius", 1.0, 10.0, 0.01);
-    const df = gui.add(effectController, "distanceFalloff", 0.0, 10.0, 0.01);
-    gui.add(effectController, "screenSpaceRadius").onChange((value) => {
-        if (value) {
-            effectController.aoRadius = 48.0;
-            effectController.distanceFalloff = 0.2;
-            aor._min = 0;
-            aor._max = 64;
-            df._min = 0;
-            df._max = 1;
-        } else {
-            effectController.aoRadius = 5.0;
-            effectController.distanceFalloff = 1.0;
-            aor._min = 1;
-            aor._max = 10;
-            df._min = 0;
-            df._max = 10;
-        }
-        aor.updateDisplay();
-        df.updateDisplay();
+    gui.add(effectController, "flareAmount", 0, 128, 2).onChange((value) => {
+        CURR_FLARES = value;
     });
-    gui.add(effectController, "halfRes");
-    gui.add(effectController, "depthAwareUpsampling");
-    gui.add(effectController, "transparencyAware");
-    gui.add(effectController, "intensity", 0.0, 10.0, 0.01);
-    gui.addColor(effectController, "color");
-    gui.add(effectController, "colorMultiply");
-    gui.add(effectController, "accumulate");
-    gui.add(effectController, "renderMode", ["Combined", "AO", "No AO", "Split", "Split AO"]);
+    /* gui.add(effectController, "aoSamples", 1.0, 64.0, 1.0);
+     gui.add(effectController, "denoiseSamples", 1.0, 64.0, 1.0);
+     gui.add(effectController, "denoiseRadius", 0.0, 24.0, 0.01);
+     const aor = gui.add(effectController, "aoRadius", 1.0, 10.0, 0.01);
+     const df = gui.add(effectController, "distanceFalloff", 0.0, 10.0, 0.01);
+     gui.add(effectController, "screenSpaceRadius").onChange((value) => {
+         if (value) {
+             effectController.aoRadius = 48.0;
+             effectController.distanceFalloff = 0.2;
+             aor._min = 0;
+             aor._max = 64;
+             df._min = 0;
+             df._max = 1;
+         } else {
+             effectController.aoRadius = 5.0;
+             effectController.distanceFalloff = 1.0;
+             aor._min = 1;
+             aor._max = 10;
+             df._min = 0;
+             df._max = 10;
+         }
+         aor.updateDisplay();
+         df.updateDisplay();
+     });
+     gui.add(effectController, "halfRes");
+     gui.add(effectController, "depthAwareUpsampling");
+     gui.add(effectController, "transparencyAware");
+     gui.add(effectController, "intensity", 0.0, 10.0, 0.01);
+     gui.addColor(effectController, "color");
+     gui.add(effectController, "colorMultiply");
+     gui.add(effectController, "accumulate");
+     gui.add(effectController, "renderMode", ["Combined", "AO", "No AO", "Split", "Split AO"]);*/
     // Post Effects
     //  const composer = new EffectComposer(renderer);
     /* const n8aopass = new N8AOPass(
@@ -168,8 +172,10 @@ async function main() {
         clientWidth,
         clientHeight
     );
-    const flares = [];
-    for (let i = 0; i < 64; i++) {
+    let flares = [];
+    const MAX_FLARES = 128;
+    let CURR_FLARES = 64;
+    for (let i = 0; i < MAX_FLARES; i++) {
         const flare = new Flare({
             position: new THREE.Vector3(Math.random() * 100 - 50, Math.random() * 20, Math.random() * 20 - 10),
             colorGain: new THREE.Color(Math.random(), Math.random(), Math.random())
@@ -242,14 +248,21 @@ async function main() {
             groundPlane,
             lightPos4d
         );
-
-        for (let i = 0; i < flares.length / 2; i++) {
-            flares[i].position.copy(catmullromArc.getPointAt((i / (flares.length / 2) + performance.now() / 50000.0) % 1));
+        for (let i = 0; i < CURR_FLARES / 2; i++) {
+            flares[i].position.copy(catmullromArc.getPointAt((i / (CURR_FLARES / 2) + performance.now() / 50000.0) % 1));
         }
-        for (let i = flares.length / 2; i < flares.length; i++) {
-            flares[i].position.copy(catmullromArc.getPointAt(((i - flares.length / 2) / (flares.length / 2) + performance.now() / 50000.0) % 1));
+        for (let i = CURR_FLARES / 2; i < CURR_FLARES; i++) {
+            flares[i].position.copy(catmullromArc.getPointAt(((i - CURR_FLARES / 2) / (CURR_FLARES / 2) + performance.now() / 50000.0) % 1));
             flares[i].position.y += 40;
         }
+        for (let i = 0; i < MAX_FLARES; i++) {
+            if (i < CURR_FLARES) {
+                flares[i].visible = true;
+            } else {
+                flares[i].visible = false;
+            }
+        }
+
 
 
         n8aopass.configuration.aoRadius = effectController.aoRadius;
