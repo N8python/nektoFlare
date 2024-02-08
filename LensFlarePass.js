@@ -6,37 +6,34 @@ class Flare extends THREE.Object3D {
     constructor({
         enabled = true,
         position = new THREE.Vector3(0, 20, 0),
-        opacity = 0.8,
         colorGain = new THREE.Color(1.0, 0.1, 0.1),
+        angle = 0,
+        opacity = 0.8,
         starPoints = 5.0,
         glareSize = 0.55,
         flareSize = 0.004,
         flareSpeed = 0.4,
         flareShape = 1.2,
-        haloScale = 0.5,
-        animated = true,
         anamorphic = false,
         secondaryGhosts = true,
-        starBurst = true,
         ghostScale = 0.3,
         additionalStreaks = true,
+
     } = {}) {
         super();
         this.enabled = enabled;
         this.position.copy(position);
         this.lensPosition = new THREE.Vector3(0.5, 0.5, 0.5);
         this.opacity = opacity;
+        this.angle = angle;
         this.colorGain = colorGain;
         this.starPoints = starPoints;
         this.glareSize = glareSize;
         this.flareSize = flareSize;
         this.flareSpeed = flareSpeed;
         this.flareShape = flareShape;
-        this.haloScale = haloScale;
-        this.animated = animated;
         this.anamorphic = anamorphic;
         this.secondaryGhosts = secondaryGhosts;
-        this.starBurst = starBurst;
         this.ghostScale = ghostScale;
         this.additionalStreaks = additionalStreaks;
     }
@@ -286,6 +283,9 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
                 flare: {
                     value: Array(4)
                 },
+                flareIndices: {
+                    value: [0, 0, 0, 0]
+                },
                 numFlares: {
                     value: 4
                 },
@@ -306,6 +306,9 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
                 },
                 cameraDirection: {
                     value: new THREE.Vector3(0, 0, 0)
+                },
+                time: {
+                    value: 0
                 }
             },
             vertexShader: `
@@ -327,18 +330,18 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
                 float flareSize;
                 float flareSpeed;
                 float flareShape;
-                float haloScale;
-                bool animated;
                 bool anamorphic;
                 bool secondaryGhosts;
-                bool starBurst;
                 float ghostScale;
                 bool additionalStreaks;
+                float angle;
             };
             uniform Flare[4] flare;
+            uniform float[4] flareIndices;
             uniform int numFlares;
             uniform vec2 resolution;
             uniform vec3[4] lensPosition;
+            uniform float time;
             uniform vec3 cameraPos;
             uniform vec3 cameraDirection;
             varying vec2 vUv;
@@ -382,12 +385,12 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
             }
         
             // Based on https://www.shadertoy.com/view/XtKfRV
-            vec3 drawflare(Flare flare, vec2 p, float intensity, float rnd, float speed, int id)
+            vec3 drawflare(Flare flare, vec2 p, float intensity, float rnd, float speed, float id)
             {
-                float flarehueoffset = (1. / 32.) * float(id) * 0.1;
+                float flarehueoffset = 0.0;//(1. / 32.) * float(id) * 0.1;
                 float lingrad = distance(vec2(0.), p);
                 float expgrad = 1. / exp(lingrad * (fract(rnd) * 0.66 + 0.33));
-                vec3 colgrad = hsv2rgb(vec3( fract( (expgrad * 8.) + speed * flare.flareSpeed + flarehueoffset), pow(1.-abs(expgrad*2.-1.), 0.45), 20.0 * expgrad * intensity)); //rainbow spectrum effect
+                vec3 colgrad = hsv2rgb(vec3( fract( (expgrad * 8.) + speed * flare.flareSpeed * time + flarehueoffset), pow(1.-abs(expgrad*2.-1.), 0.45), 20.0 * expgrad * intensity)); //rainbow spectrum effect
         
                 float internalStarPoints;
         
@@ -397,7 +400,7 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
                     internalStarPoints = flare.starPoints;
                 }
                 
-                float blades = length(p * flare.flareShape * sin(internalStarPoints * atan(p.x, p.y))); //draw 6 blades
+                float blades = length(p * flare.flareShape * sin(internalStarPoints * (atan(p.x, p.y)) + flare.angle + flare.flareSpeed * time)); //draw 6 blades
                 
                 float comp = pow(1.-saturate2(blades), ( flare.anamorphic ? 100. : 12.));
                 comp += saturate2(expgrad-0.9) * 3.;
@@ -412,14 +415,14 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
         
             float dist(vec3 a, vec3 b) { return abs(a.x - b.x) + abs(a.y - b.y) + abs(a.z - b.z); }
         
-            float glare(Flare flare, vec2 uv, vec2 pos, float size)
+            float glare(Flare flare, vec2 uv, vec2 pos, float size, float id)
             {
                 vec2 main;
         
              
                 main = uv-pos;     
                 
-                float ang = atan(main.y, main.x) * (flare.anamorphic ? 1.0 : flare.starPoints);
+                float ang = atan(main.y, main.x) * (flare.anamorphic ? 1.0 : flare.starPoints)  + flare.angle + flare.flareSpeed * time;
                 float dist = length(main); 
                 dist = pow(dist, .9);
                 
@@ -448,12 +451,12 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
                 return vec3(0);
             }
         
-            vec3 LensFlare(Flare flare, vec2 uv, vec2 pos)
+            vec3 LensFlare(Flare flare, vec2 uv, vec2 pos, float id)
             {
                 vec2 main = uv-pos;
                 vec2 uvd = uv*(length(uv));
                 
-                float ang = atan(main.x,main.y);
+                float ang = atan(main.x,main.y) + flare.angle + flare.flareSpeed * time;
                 
                 float f0 = .3/(length(uv-pos)*16.0+1.0);
                 
@@ -483,7 +486,7 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
                 float f62 = max(0.01-pow(length(uvx-0.325*pos),1.614),.0)*3.14;
                 float f63 = max(0.01-pow(length(uvx-0.389*pos),1.623),.0)*3.12;
                 
-                vec3 c = vec3(glare(flare, uv,pos, flare.glareSize));
+                vec3 c = vec3(glare(flare, uv,pos, flare.glareSize, id));
         
                 vec2 prot;
         
@@ -493,7 +496,7 @@ vec4 texture_bicubic(sampler2D tex, vec2 uv, vec4 texelSize)
                     prot = uv - pos;
                 }
         
-                c += drawflare(flare, prot, (flare.anamorphic ? flare.flareSize * 10. : flare.flareSize), 0.1, 0.0, 1);
+                c += drawflare(flare, prot, (flare.anamorphic ? flare.flareSize * 10. : flare.flareSize), 0.1, 0.0, id);
                 
 c.r+=f1+f2+f4+f5+f6; c.g+=f1+f22+f42+f52+f62; c.b+=f1+f23+f43+f53+f63;
                 c = c*1.3 * vec3(length(uvd)+.09); // Vignette
@@ -531,30 +534,6 @@ c.r+=f1+f2+f4+f5+f6; c.g+=f1+f22+f42+f52+f62; c.b+=f1+f23+f43+f53+f63;
                 return f;
             }
         
-            // Based on https://www.shadertoy.com/view/Xlc3D2
-            vec3 circle(Flare flare, vec2 p, float size, float decay, vec3 color, vec3 color2, float dist, vec2 mouse)
-            {
-                float l = length(p + mouse*(dist*2.))+size/2.;
-                float l2 = length(p + mouse*(dist*4.))+size/3.;
-                
-                float c = max(0.04-pow(length(p + mouse*dist), size*flare.ghostScale), 0.0)*10.;
-                float c1 = max(0.001-pow(l-0.3, 1./40.)+sin(l*20.), 0.0)*3.;
-                float c2 =  max(0.09/pow(length(p-mouse*dist/.5)*1., .95), 0.0)/20.;
-                float s = max(0.02-pow(regShape(flare, p*5. + mouse*dist*5. + decay, 6) , 1.), 0.0)*1.5;
-                
-                color = (vec3(flare.colorGain));
-                vec3 f = c*color;
-                f += c1*color;
-                f += c2*color;  
-                f +=  s*color;
-                return f;
-            }
-
-        
-            float sdCircle(vec2 p, float r){
-                return length(p) - r;
-            }
-
             void main() {
                 vec2 uv = vUv;
                 vec2 myUV = uv -0.5;
@@ -575,16 +554,15 @@ c.r+=f1+f2+f4+f5+f6; c.g+=f1+f22+f42+f52+f62; c.b+=f1+f23+f43+f53+f63;
                     if (occluded < 1.0){
                         vec2 mouse = (lensPosition[i].xy * 2.0 - 1.0) * 0.5;
                         mouse.y *= resolution.y/resolution.x;
-                        vec3 finalColor = LensFlare(flare[i], myUV, mouse) * 5.0 * flare[i].colorGain;
+                        vec3 finalColor = LensFlare(flare[i], myUV, mouse, flareIndices[i]) * 5.0 * flare[i].colorGain;
                         vec3 lensPositionNDC = lensPosition[i] * 2.0 - 1.0;
                        if(flare[i].additionalStreaks){
                             vec3 circColor = mix(flare[i].colorGain, vec3(1.0), 0.3);
                             vec3 circColor2 =mix(flare[i].colorGain, vec3(1.0), 0.8);
                 
                             for(float j=0.;j<10.;j++){
-                                vec2 circleUv = (mouse.xy) * 0.5 * (j - 5.0 + rand(j + 10.0));
-                                float sd = sdCircle(myUV - circleUv, 0.01 * rand(j));
-                                finalColor += pow(1.0 / (1.0 + distance(myUV, circleUv)), 512.0) * circColor  * rand(j + 100.0);
+                                vec2 circleUv = (mouse.xy) * 0.5 * (j - 5.0 + rand(j + 10.0 + 1000.0 * flareIndices[i]));
+                                finalColor += pow(1.0 / (1.0 + distance(myUV, circleUv)), 512.0) * circColor  * rand(j + 100.0+ 1000.0 * flareIndices[i]);
                             }
                         }
                         if(flare[i].secondaryGhosts){
@@ -756,6 +734,8 @@ c.r+=f1+f2+f4+f5+f6; c.g+=f1+f22+f42+f52+f62; c.b+=f1+f23+f43+f53+f63;
             renderer.autoClear = false;
             this.flareQuad.material.uniforms.depthTexture.value = this.depthTexture;
             this.flareQuad.material.uniforms.coverageTexture.value = this.coverageTarget.texture;
+            this.flareQuad.material.uniforms.time.value = performance.now() / 1000;
+            this.flareQuad.material.uniforms.flareIndices.value = batch.map((flare) => this.flares.indexOf(flare));
             batch.forEach((flare, index) => {
                 this.flareQuad.material.uniforms.flare.value[index] = flare;
                 this.flareQuad.material.uniforms.lensPosition.value[index] = flare.lensPosition;

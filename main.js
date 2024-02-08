@@ -109,44 +109,33 @@ async function main() {
         color: [0, 0, 0],
         colorMultiply: true,
         accumulate: false,
-        flareAmount: 64
+        flareAmount: 64,
+        opacity: 0.8,
+        starPoints: 5.0,
+        glareSize: 0.55,
+        flareSize: 0.004,
+        flareSpeed: 0.4,
+        flareShape: 1.2,
+        anamorphic: false,
+        secondaryGhosts: true,
+        ghostScale: 0.3,
+        additionalStreaks: true,
     };
     const gui = new GUI();
-    gui.add(effectController, "flareAmount", 0, 128, 2).onChange((value) => {
+    gui.add(effectController, "flareAmount", 0, 512, 2).onChange((value) => {
         CURR_FLARES = value;
     });
-    /* gui.add(effectController, "aoSamples", 1.0, 64.0, 1.0);
-     gui.add(effectController, "denoiseSamples", 1.0, 64.0, 1.0);
-     gui.add(effectController, "denoiseRadius", 0.0, 24.0, 0.01);
-     const aor = gui.add(effectController, "aoRadius", 1.0, 10.0, 0.01);
-     const df = gui.add(effectController, "distanceFalloff", 0.0, 10.0, 0.01);
-     gui.add(effectController, "screenSpaceRadius").onChange((value) => {
-         if (value) {
-             effectController.aoRadius = 48.0;
-             effectController.distanceFalloff = 0.2;
-             aor._min = 0;
-             aor._max = 64;
-             df._min = 0;
-             df._max = 1;
-         } else {
-             effectController.aoRadius = 5.0;
-             effectController.distanceFalloff = 1.0;
-             aor._min = 1;
-             aor._max = 10;
-             df._min = 0;
-             df._max = 10;
-         }
-         aor.updateDisplay();
-         df.updateDisplay();
-     });
-     gui.add(effectController, "halfRes");
-     gui.add(effectController, "depthAwareUpsampling");
-     gui.add(effectController, "transparencyAware");
-     gui.add(effectController, "intensity", 0.0, 10.0, 0.01);
-     gui.addColor(effectController, "color");
-     gui.add(effectController, "colorMultiply");
-     gui.add(effectController, "accumulate");
-     gui.add(effectController, "renderMode", ["Combined", "AO", "No AO", "Split", "Split AO"]);*/
+    gui.add(effectController, "opacity", 0, 1, 0.01);
+    gui.add(effectController, "starPoints", 0, 10, 1);
+    gui.add(effectController, "glareSize", 0, 1, 0.01);
+    gui.add(effectController, "flareSize", 0, 0.01, 0.0001);
+    gui.add(effectController, "flareSpeed", 0, 1, 0.01);
+    gui.add(effectController, "flareShape", 0, 2, 0.01);
+    gui.add(effectController, "anamorphic");
+    gui.add(effectController, "secondaryGhosts");
+    gui.add(effectController, "ghostScale", 0, 1, 0.01);
+    gui.add(effectController, "additionalStreaks");
+
     // Post Effects
     //  const composer = new EffectComposer(renderer);
     /* const n8aopass = new N8AOPass(
@@ -173,13 +162,14 @@ async function main() {
         clientHeight
     );
     let flares = [];
-    const MAX_FLARES = 128;
+    const MAX_FLARES = 512;
     let CURR_FLARES = 64;
     for (let i = 0; i < MAX_FLARES; i++) {
         const flare = new Flare({
             position: new THREE.Vector3(Math.random() * 100 - 50, Math.random() * 20, Math.random() * 20 - 10),
-            colorGain: new THREE.Color(Math.random(), Math.random(), Math.random())
-                // position: new THREE.Vector3(0, 10, 0),
+            colorGain: new THREE.Color(Math.random(), Math.random(), Math.random()),
+            angle: Math.random() * Math.PI * 2,
+            // position: new THREE.Vector3(0, 10, 0),
         });
         flares.push(flare);
     }
@@ -261,6 +251,16 @@ async function main() {
             } else {
                 flares[i].visible = false;
             }
+            flares[i].opacity = effectController.opacity;
+            flares[i].starPoints = effectController.starPoints;
+            flares[i].glareSize = effectController.glareSize;
+            flares[i].flareSize = effectController.flareSize;
+            flares[i].flareSpeed = effectController.flareSpeed;
+            flares[i].flareShape = effectController.flareShape;
+            flares[i].anamorphic = effectController.anamorphic;
+            flares[i].secondaryGhosts = effectController.secondaryGhosts;
+            flares[i].ghostScale = effectController.ghostScale;
+            flares[i].additionalStreaks = effectController.additionalStreaks;
         }
 
 
